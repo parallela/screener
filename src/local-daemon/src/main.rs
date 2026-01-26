@@ -1,13 +1,13 @@
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::mpsc::channel;
+use std::time::{Duration, Instant};
 use tracing::{error, info, warn};
 
 #[derive(Deserialize)]
@@ -46,21 +46,14 @@ fn is_image_file(path: &Path) -> bool {
 }
 
 fn copy_to_clipboard(text: &str) {
-    match Command::new("pbcopy")
-        .stdin(Stdio::piped())
-        .spawn()
-    {
-        Ok(mut child) => {
-            if let Some(stdin) = child.stdin.as_mut() {
-                if stdin.write_all(text.as_bytes()).is_ok() {
-                    let _ = child.wait();
-                    info!("Copied to clipboard: {}", text);
-                }
+    match ClipboardContext::new() {
+        Ok(mut ctx) => {
+            match ctx.set_contents(text.to_string()) {
+                Ok(_) => info!("Clipboard: copied {}", text),
+                Err(e) => error!("Clipboard: failed to set text: {}", e),
             }
         }
-        Err(e) => {
-            warn!("Failed to copy to clipboard: {}", e);
-        }
+        Err(e) => error!("Clipboard: failed to access: {}", e),
     }
 }
 
@@ -97,6 +90,8 @@ fn upload_file(config: &DaemonConfig, file_path: &Path) -> bool {
         let form = Form::new().part("file", part);
 
         let client = reqwest::Client::new();
+
+        info!("Uploading {} to {}", file_name, config.api_url);
 
         match client
             .post(&config.api_url)
@@ -160,7 +155,10 @@ fn main() {
 
     let (tx, rx) = channel();
 
-    let mut watcher: RecommendedWatcher = match Watcher::new(tx, Config::default()) {
+    let watcher_config = Config::default()
+        .with_poll_interval(Duration::from_secs(1));
+
+    let mut watcher: RecommendedWatcher = match Watcher::new(tx, watcher_config) {
         Ok(w) => w,
         Err(e) => {
             error!("Failed to create watcher: {}", e);
@@ -173,7 +171,9 @@ fn main() {
         std::process::exit(1);
     }
 
-    let mut processed: HashSet<PathBuf> = HashSet::new();
+    info!("Watcher started successfully");
+
+    let mut processed: HashMap<PathBuf, Instant> = HashMap::new();
 
     loop {
         match rx.recv() {
@@ -191,20 +191,25 @@ fn main() {
     }
 }
 
-fn handle_event(config: &DaemonConfig, event: Event, processed: &mut HashSet<PathBuf>) {
+fn handle_event(config: &DaemonConfig, event: Event, processed: &mut HashMap<PathBuf, Instant>) {
+    let debounce_duration = Duration::from_secs(2);
+
     match event.kind {
-        EventKind::Create(_) => {
-            for path in event.paths {
-                if path.is_file() && is_image_file(&path) && !processed.contains(&path) {
-                    info!("New image detected: {:?}", path);
+        EventKind::Create(_) | EventKind::Modify(_) => {
+            for path in &event.paths {
+                if !path.is_file() || !is_image_file(path) {
+                    continue;
+                }
 
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-
-                    if path.exists() && !processed.contains(&path) {
-                        processed.insert(path.clone());
-                        upload_file(config, &path);
+                if let Some(last_time) = processed.get(path) {
+                    if last_time.elapsed() < debounce_duration {
+                        continue;
                     }
                 }
+
+                info!("File detected: {:?}", path);
+                processed.insert(path.clone(), Instant::now());
+                upload_file(config, path);
             }
         }
         _ => {}

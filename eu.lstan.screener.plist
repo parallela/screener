@@ -14,6 +14,8 @@
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
     <key>StandardOutPath</key>
     <string>/Users/lubomirstankov/Library/Logs/screener.log</string>
     <key>StandardErrorPath</key>
