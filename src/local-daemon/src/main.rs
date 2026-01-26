@@ -8,7 +8,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::channel;
-use std::time::SystemTime;
 use tracing::{error, info, warn};
 
 #[derive(Deserialize)]
@@ -134,32 +133,6 @@ fn upload_file(config: &DaemonConfig, file_path: &Path) -> bool {
     })
 }
 
-fn find_latest_image(folder: &Path) -> Option<PathBuf> {
-    let mut latest: Option<(PathBuf, SystemTime)> = None;
-
-    if let Ok(entries) = fs::read_dir(folder) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() && is_image_file(&path) {
-                if let Ok(metadata) = entry.metadata() {
-                    if let Ok(modified) = metadata.modified() {
-                        match &latest {
-                            Some((_, latest_time)) if modified > *latest_time => {
-                                latest = Some((path, modified));
-                            }
-                            None => {
-                                latest = Some((path, modified));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    latest.map(|(p, _)| p)
-}
 
 fn main() {
     tracing_subscriber::fmt()
