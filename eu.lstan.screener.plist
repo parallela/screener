@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>eu.lstan.screener</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/lubomirstankov/Development/me/screener/target/release/local-daemon</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/lubomirstankov/Development/me/screener/src/local-daemon</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/lubomirstankov/Library/Logs/screener.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lubomirstankov/Library/Logs/screener.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>WATCH_FOLDER</key>
+        <string>/Users/lubomirstankov/Pictures/shotr</string>
+        <key>API_URL</key>
+        <string>https://i.lstan.eu/upload</string>
+        <key>SECRET_KEY</key>
+        <string>lubo:bd0f8e075f84e5f0747b9bfcca76100d</string>
+        <key>RUST_LOG</key>
+        <string>info</string>
+    </dict>
+</dict>
+</plist>
