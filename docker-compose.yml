@@ -1,0 +1,32 @@
+services:
+  local-daemon:
+    build:
+      context: ./src/local-daemon
+      dockerfile: Dockerfile
+    volumes:
+      - ./watch:/watch
+    environment:
+      - WATCH_FOLDER=/watch
+      - API_URL=http://remote-server:3000/upload
+      - MAX_FOLDER_SIZE_GB=30
+      - FILES_TO_DELETE_ON_CLEANUP=30
+      - RUST_LOG=info
+    depends_on:
+      - remote-server
+    restart: unless-stopped
+
+  remote-server:
+    build:
+      context: ./src/remote-server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      - STORAGE_PATH=/data
+      - BASE_URL=https://i.lstan.eu
+      - BIND_ADDR=0.0.0.0:3000
+      - MAX_UPLOAD_MB=50
+      - RUST_LOG=info
+    restart: unless-stopped

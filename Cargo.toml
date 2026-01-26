@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "src/local-daemon",
+    "src/remote-server",
+]
+resolver = "2"
