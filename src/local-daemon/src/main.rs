@@ -57,6 +57,51 @@ fn copy_to_clipboard(text: &str) {
     }
 }
 
+fn read_stable_file(path: &Path) -> Option<Vec<u8>> {
+    const MAX_ATTEMPTS: usize = 20;
+    const POLL_INTERVAL: Duration = Duration::from_millis(250);
+    const STABLE_READS_REQUIRED: usize = 3;
+
+    let mut last_size = None;
+    let mut stable_reads = 0;
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match fs::read(path) {
+            Ok(content) if !content.is_empty() => {
+                let size = content.len();
+
+                if last_size == Some(size) {
+                    stable_reads += 1;
+                } else {
+                    last_size = Some(size);
+                    stable_reads = 1;
+                }
+
+                if stable_reads >= STABLE_READS_REQUIRED {
+                    return Some(content);
+                }
+            }
+            Ok(_) => {
+                last_size = Some(0);
+                stable_reads = 0;
+            }
+            Err(e) => {
+                if attempt == MAX_ATTEMPTS {
+                    error!("Failed to read file {:?}: {}", path, e);
+                    return None;
+                }
+            }
+        }
+
+        if attempt < MAX_ATTEMPTS {
+            std::thread::sleep(POLL_INTERVAL);
+        }
+    }
+
+    warn!("File did not become stable in time: {:?}", path);
+    None
+}
+
 fn upload_file(config: &DaemonConfig, file_path: &Path) -> bool {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let path_owned = file_path.to_path_buf();
@@ -68,12 +113,9 @@ fn upload_file(config: &DaemonConfig, file_path: &Path) -> bool {
             .unwrap_or("image.png")
             .to_string();
 
-        let file_content = match fs::read(&path_owned) {
-            Ok(content) => content,
-            Err(e) => {
-                error!("Failed to read file {:?}: {}", path_owned, e);
-                return false;
-            }
+        let file_content = match read_stable_file(&path_owned) {
+            Some(content) => content,
+            None => return false,
         };
 
         let mime_type = if file_name.to_lowercase().ends_with(".png") {
