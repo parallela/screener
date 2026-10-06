@@ -3,6 +3,10 @@ Cargo.lock
 *.log
 .env
 **/.env
+local-daemon.env
+**/local-daemon.env
+local-daemon.exe
+**/local-daemon.exe
 .DS_Store
 *.swp
 *.swo
